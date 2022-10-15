@@ -1,5 +1,7 @@
+from argparse import Namespace
 import mcstatus
 import threading
+
 
 def generate_ip_strings(ip,mask):
     """Mask = {8,16,24,32} | 8 = ip + .{}.{}.{}"""
@@ -48,6 +50,7 @@ def args():
     parser.add_argument('-m', '--mask', help='Mask to scan', required=True)
     parser.add_argument('-s', '--scan', help='Scan type | mcstatus-sync | mcstatus-async', required=True)
     parser.add_argument('-t', '--threads', help='Number of threads to use', required=False)
+    parser.add_argument('-v', '--verbose', help='Verbose', required=False, action='store_true')
     args = parser.parse_args()
     return args
 
@@ -64,24 +67,26 @@ def append_to_file(file_name,text):
     with open(file_name, 'a') as f:
         f.write(text)
 
-def thread_function(ip_list,thread_id):
-    print(f"Thread {thread_id} started")
-    print(ip_list)
+def thread_function(ip_list,thread_id,verbose=0):
+    print(f"Thread {thread_id} started on ip-s: {ip_list[0]} to {ip_list[-1]}")
     for ip in ip_list:
+        if verbose != 0: print("\nIP: {}".format(ip))
         x = omni_mcstatus_request(ip)
         if x[0] != None:
-            append_to_file(f"{thread_id}_thread.txt",f"{ip}|{x[0]} - JavaServer")
+            append_to_file(f"{thread_id}_thread.txt\n",f"{ip}|{x[0]} - JavaServer")
         if x[1] != None:
-            append_to_file(f"{thread_id}_thread.txt",f"{ip}|{x[1]} - BedrockServer")
+            append_to_file(f"{thread_id}_thread.txt\n",f"{ip}|{x[1]} - BedrockServer")
     print(f"Thread {thread_id} finished")
-    
+
 def main():
     arg = args()
+    global_args = arg
     print(arg)
     if arg.scan == 'mcstatus-sync':
         list = generate_ip_strings(arg.ip,arg.mask)
-        print(list)
+        print("Synchronously scanning the following ip range :{} to {}".format(list[0],list[-1]))
         for ip in list:
+            if arg.verbose != 0: print("\nIP: {}".format(ip))
             x = omni_mcstatus_request(ip)
             if x[0] != None:
                 print(f"{ip}|{x[0]} - JavaServer")
@@ -89,16 +94,15 @@ def main():
                 print(f"{ip}|{x[1]} - BedrockServer")
     elif arg.scan == 'mcstatus-async':
         list = generate_ip_strings(arg.ip,arg.mask)
-        print(list)
         threads = []
         if arg.threads == None:
             arg.threads = 15
         avg_workload = round(len(list) / int(arg.threads))
         for i in range(int(arg.threads)+1):
             if i == int(arg.threads) - 1:
-                threads.append(threading.Thread(target=thread_function, args=(list[i*avg_workload:],i)))
+                threads.append(threading.Thread(target=thread_function, args=(list[i*avg_workload:],i,arg.verbose)))
             else:
-                threads.append(threading.Thread(target=thread_function, args=(list[i*avg_workload:(i+1)*avg_workload],i)))
+                threads.append(threading.Thread(target=thread_function, args=(list[i*avg_workload:(i+1)*avg_workload],i,arg.verbose)))
         for thread in threads:
             thread.start()
         for thread in threads:
