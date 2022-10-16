@@ -2,7 +2,6 @@ from argparse import Namespace
 import mcstatus
 import threading
 
-
 def generate_ip_strings(ip,mask):
     """Mask = {8,16,24,32} | 8 = ip + .{}.{}.{}"""
 
@@ -48,7 +47,7 @@ def args():
     parser.add_argument('-i', '--ip', help='IP to scan', required=True)
     parser.add_argument('-p', '--port', help='Port to scan', required=False)
     parser.add_argument('-m', '--mask', help='Mask to scan', required=True)
-    parser.add_argument('-s', '--scan', help='Scan type | mcstatus-sync | mcstatus-async', required=True)
+    parser.add_argument('-s', '--scan', help='Scan type | sync | async | compress | test', required=True)
     parser.add_argument('-t', '--threads', help='Number of threads to use', required=False)
     parser.add_argument('-v', '--verbose', help='Verbose', required=False, action='store_true')
     args = parser.parse_args()
@@ -67,22 +66,37 @@ def append_to_file(file_name,text):
     with open(file_name, 'a') as f:
         f.write(text)
 
+def compress_all_txt_files_in_dir():
+    import os
+    text = {}
+    for file in os.listdir():
+        if file.endswith(".txt"):
+            #open file with utf-8
+            with open(file, 'r', encoding='utf-8') as f:
+                text[file] = f.read()
+            #delete file
+            os.remove(file)
+    #create new file
+    with open("all.txt", 'w', encoding='utf-8') as f:
+        for key in text:
+            f.write(key+":"+text[key]+"\n")
+
 def thread_function(ip_list,thread_id,verbose=0):
     print(f"Thread {thread_id} started on ip-s: {ip_list[0]} to {ip_list[-1]}")
     for ip in ip_list:
         if verbose != 0: print("\nIP: {}".format(ip))
         x = omni_mcstatus_request(ip)
         if x[0] != None:
-            append_to_file(f"{thread_id}_thread.txt\n",f"{ip}|{x[0]} - JavaServer")
+            append_to_file(f"{thread_id}_thread.txt",f"{ip}|{x[0]} - JavaServer")
         if x[1] != None:
-            append_to_file(f"{thread_id}_thread.txt\n",f"{ip}|{x[1]} - BedrockServer")
+            append_to_file(f"{thread_id}_thread.txt",f"{ip}|{x[1]} - BedrockServer")
     print(f"Thread {thread_id} finished")
 
 def main():
     arg = args()
     global_args = arg
     print(arg)
-    if arg.scan == 'mcstatus-sync':
+    if arg.scan == 'sync':
         list = generate_ip_strings(arg.ip,arg.mask)
         print("Synchronously scanning the following ip range :{} to {}".format(list[0],list[-1]))
         for ip in list:
@@ -92,7 +106,7 @@ def main():
                 print(f"{ip}|{x[0]} - JavaServer")
             if x[1] != None:
                 print(f"{ip}|{x[1]} - BedrockServer")
-    elif arg.scan == 'mcstatus-async':
+    elif arg.scan == 'async':
         list = generate_ip_strings(arg.ip,arg.mask)
         threads = []
         if arg.threads == None:
@@ -110,6 +124,8 @@ def main():
         print("Finished")
     elif arg.scan == "test":
         append_to_file("test.txt","test")
+    elif arg.scan == "compress":
+        compress_all_txt_files_in_dir()
     else:
         print('Invalid scan type')
 
